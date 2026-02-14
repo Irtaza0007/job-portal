@@ -22,7 +22,7 @@ jobs:
 
       # Build frontend image
       - name: Build frontend image
-        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/frontend:latest -f Client/Dockerfile .
+        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/frontend:latest ./Client
 
       # Push frontend image
       - name: Push frontend image
@@ -30,7 +30,7 @@ jobs:
 
       # Build backend image
       - name: Build backend image
-        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/backend:latest -f Server/Dockerfile .
+        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/backend:latest ./Server
 
       # Push backend image
       - name: Push backend image
