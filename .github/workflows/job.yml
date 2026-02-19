@@ -15,47 +15,56 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Configure AWS
-        uses: aws-actions/configure-aws-credentials@v4
+      - uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Login to ECR
-        uses: aws-actions/amazon-ecr-login@v2
+      - uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Set commit tag
+      - name: Set image tag
         run: echo "IMAGE_TAG=${GITHUB_SHA}" >> $GITHUB_ENV
 
-      # -------- Build Backend --------
+      # -------- Backend --------
       - name: Build backend
-        run: docker build -t server ./Server
+        run: docker build -t server ./server
 
       - name: Tag & Push backend
         run: |
           docker tag server:latest \
           $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:server-${IMAGE_TAG}
 
+          docker tag server:latest \
+          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:server-latest
+
           docker push \
           $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:server-${IMAGE_TAG}
 
-      # -------- Build Frontend --------
+          docker push \
+          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:server-latest
+
+      # -------- Frontend --------
       - name: Build frontend
-        run: docker build -t client ./Client
+        run: docker build -t client ./client
 
       - name: Tag & Push frontend
         run: |
           docker tag client:latest \
           $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:client-${IMAGE_TAG}
 
+          docker tag client:latest \
+          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:client-latest
+
           docker push \
           $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:client-${IMAGE_TAG}
 
-      # -------- Deploy to EC2 --------
+          docker push \
+          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:client-latest
+
+      # -------- Deploy via Docker Compose --------
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -63,31 +72,18 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            IMAGE_TAG=${{ github.sha }}
             AWS_REGION=${{ secrets.AWS_REGION }}
             AWS_ACCOUNT_ID=${{ secrets.AWS_ACCOUNT_ID }}
 
-            echo "Logging into ECR..."
+            echo "Login to ECR"
             aws ecr get-login-password --region $AWS_REGION | \
             docker login --username AWS --password-stdin \
             $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
-            echo "Pulling new images..."
-            docker pull $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/codesnippet/dockerdemoapp:server-$IMAGE_TAG
-            docker pull $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/codesnippet/dockerdemoapp:client-$IMAGE_TAG
+            echo "Pull latest images"
+            docker compose pull
 
-            echo "Stopping old containers..."
-            docker stop backend || true
-            docker stop frontend || true
+            echo "Restart services"
+            docker compose up -d
 
-            docker rm backend || true
-            docker rm frontend || true
-
-            echo "Starting new containers..."
-            docker run -d --name backend -p 5000:5000 \
-            $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/codesnippet/dockerdemoapp:server-$IMAGE_TAG
-
-            docker run -d --name frontend -p 80:80 \
-            $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/codesnippet/dockerdemoapp:client-$IMAGE_TAG
-
-            echo "Deployment complete."
+            echo "Deployment completed"

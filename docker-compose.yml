@@ -1,11 +1,16 @@
-version: '3'
+version: '3.8'
+
 services:
   backend:
-    image: 123456789012.dkr.ecr.ap-south-1.amazonaws.com/codesnippet/dockerdemoapp:server-abc123
+    image: 123456789012.dkr.ecr.ap-south-1.amazonaws.com/codesnippet/dockerdemoapp:server-latest
+    container_name: backend
     ports:
       - "5000:5000"
+    restart: always
 
   frontend:
-    image: 123456789012.dkr.ecr.ap-south-1.amazonaws.com/codesnippet/dockerdemoapp:client-abc123
+    image: 123456789012.dkr.ecr.ap-south-1.amazonaws.com/codesnippet/dockerdemoapp:client-latest
+    container_name: frontend
     ports:
       - "80:80"
+    restart: always
