@@ -28,12 +28,12 @@ jobs:
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Set image tag
+      - name: Set commit tag
         run: echo "IMAGE_TAG=${GITHUB_SHA}" >> $GITHUB_ENV
 
-      # ---------- Backend ----------
+      # -------- Backend --------
       - name: Build backend image
-        run: docker build -t server ./Server
+        run: docker build -t server ./server
 
       - name: Tag backend image
         run: |
@@ -45,9 +45,9 @@ jobs:
           docker push \
           $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:server-${IMAGE_TAG}
 
-      # ---------- Frontend ----------
+      # -------- Frontend --------
       - name: Build frontend image
-        run: docker build -t client ./Client
+        run: docker build -t client ./client
 
       - name: Tag frontend image
         run: |
