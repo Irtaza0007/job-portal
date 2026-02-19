@@ -1,0 +1,11 @@
+version: '3'
+services:
+  backend:
+    image: 123456789012.dkr.ecr.ap-south-1.amazonaws.com/codesnippet/dockerdemoapp:server-abc123
+    ports:
+      - "5000:5000"
+
+  frontend:
+    image: 123456789012.dkr.ecr.ap-south-1.amazonaws.com/codesnippet/dockerdemoapp:client-abc123
+    ports:
+      - "80:80"

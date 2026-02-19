@@ -1,4 +1,4 @@
-name: Build and Push to ECR (Prod)
+name: Build, Push & Deploy (Prod)
 
 on:
   push:
@@ -11,50 +11,83 @@ env:
   ECR_REPOSITORY: codesnippet/dockerdemoapp
 
 jobs:
-  build-and-push:
+  build-push-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials
+      - name: Configure AWS
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Login to Amazon ECR
+      - name: Login to ECR
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Set commit tag
         run: echo "IMAGE_TAG=${GITHUB_SHA}" >> $GITHUB_ENV
 
-      # -------- Backend --------
-      - name: Build backend image
-        run: docker build -t server ./Server
+      # -------- Build Backend --------
+      - name: Build backend
+        run: docker build -t server ./server
 
-      - name: Tag backend image
+      - name: Tag & Push backend
         run: |
           docker tag server:latest \
           $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:server-${IMAGE_TAG}
 
-      - name: Push backend image
-        run: |
           docker push \
           $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:server-${IMAGE_TAG}
 
-      # -------- Frontend --------
-      - name: Build frontend image
-        run: docker build -t client ./Client
+      # -------- Build Frontend --------
+      - name: Build frontend
+        run: docker build -t client ./client
 
-      - name: Tag frontend image
+      - name: Tag & Push frontend
         run: |
           docker tag client:latest \
           $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:client-${IMAGE_TAG}
 
-      - name: Push frontend image
-        run: |
           docker push \
           $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:client-${IMAGE_TAG}
+
+      # -------- Deploy to EC2 --------
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            IMAGE_TAG=${{ github.sha }}
+            AWS_REGION=${{ secrets.AWS_REGION }}
+            AWS_ACCOUNT_ID=${{ secrets.AWS_ACCOUNT_ID }}
+
+            echo "Logging into ECR..."
+            aws ecr get-login-password --region $AWS_REGION | \
+            docker login --username AWS --password-stdin \
+            $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+
+            echo "Pulling new images..."
+            docker pull $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/codesnippet/dockerdemoapp:server-$IMAGE_TAG
+            docker pull $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/codesnippet/dockerdemoapp:client-$IMAGE_TAG
+
+            echo "Stopping old containers..."
+            docker stop backend || true
+            docker stop frontend || true
+
+            docker rm backend || true
+            docker rm frontend || true
+
+            echo "Starting new containers..."
+            docker run -d --name backend -p 5000:5000 \
+            $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/codesnippet/dockerdemoapp:server-$IMAGE_TAG
+
+            docker run -d --name frontend -p 80:80 \
+            $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/codesnippet/dockerdemoapp:client-$IMAGE_TAG
+
+            echo "Deployment complete."
