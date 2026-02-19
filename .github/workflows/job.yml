@@ -15,24 +15,31 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      # ---------------- Checkout ----------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - uses: aws-actions/configure-aws-credentials@v4
+      # ---------------- Configure AWS ----------------
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - uses: aws-actions/amazon-ecr-login@v2
+      # ---------------- Login to ECR ----------------
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
 
+      # ---------------- Set Image Tag ----------------
       - name: Set image tag
         run: echo "IMAGE_TAG=${GITHUB_SHA}" >> $GITHUB_ENV
 
-      # -------- Backend --------
-      - name: Build backend
+      # ================= BACKEND =================
+      - name: Build backend image
         run: docker build -t server ./Server
 
-      - name: Tag & Push backend
+      - name: Tag & Push backend image
         run: |
           docker tag server:latest \
           $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:server-${IMAGE_TAG}
@@ -46,11 +53,11 @@ jobs:
           docker push \
           $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:server-latest
 
-      # -------- Frontend --------
-      - name: Build frontend
+      # ================= FRONTEND =================
+      - name: Build frontend image
         run: docker build -t client ./Client
 
-      - name: Tag & Push frontend
+      - name: Tag & Push frontend image
         run: |
           docker tag client:latest \
           $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:client-${IMAGE_TAG}
@@ -64,7 +71,7 @@ jobs:
           docker push \
           $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:client-latest
 
-      # -------- Deploy via Docker Compose --------
+      # ================= DEPLOY =================
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -72,8 +79,18 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            set -e
+
             AWS_REGION=${{ secrets.AWS_REGION }}
             AWS_ACCOUNT_ID=${{ secrets.AWS_ACCOUNT_ID }}
+
+            echo "Go to project directory"
+            cd dockerdemoapp   # change if folder name different
+
+            echo "Pull latest Prod branch"
+            git fetch origin
+            git checkout Prod
+            git pull origin Prod
 
             echo "Login to ECR"
             aws ecr get-login-password --region $AWS_REGION | \
@@ -83,7 +100,7 @@ jobs:
             echo "Pull latest images"
             docker compose pull
 
-            echo "Restart services"
-            docker compose up -d
+            echo "Restart containers"
+            docker compose up -d --remove-orphans
 
-            echo "Deployment completed"
+            echo "Deployment completed successfully"
