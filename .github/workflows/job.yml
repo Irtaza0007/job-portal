@@ -1,37 +1,60 @@
-name: Build and Push Frontend & Backend Images
+name: Build and Push to ECR (Prod)
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - Prod
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+  ECR_REPOSITORY: codesnippet/dockerdemoapp
 
 jobs:
-  docker:
+  build-and-push:
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout code
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      # Login to Docker Hub
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_TOKEN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
 
-      # Build frontend image
-      - name: Build frontend image
-        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/frontend:latest ./Client
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
 
-      # Push frontend image
-      - name: Push frontend image
-        run: docker push ${{ secrets.DOCKER_USERNAME }}/frontend:latest
+      - name: Set image tag
+        run: echo "IMAGE_TAG=${GITHUB_SHA}" >> $GITHUB_ENV
 
-      # Build backend image
+      # ---------- Backend ----------
       - name: Build backend image
-        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/backend:latest ./Server
+        run: docker build -t server ./Server
 
-      # Push backend image
+      - name: Tag backend image
+        run: |
+          docker tag server:latest \
+          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:server-${IMAGE_TAG}
+
       - name: Push backend image
-        run: docker push ${{ secrets.DOCKER_USERNAME }}/backend:latest
+        run: |
+          docker push \
+          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:server-${IMAGE_TAG}
+
+      # ---------- Frontend ----------
+      - name: Build frontend image
+        run: docker build -t client ./Client
+
+      - name: Tag frontend image
+        run: |
+          docker tag client:latest \
+          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:client-${IMAGE_TAG}
+
+      - name: Push frontend image
+        run: |
+          docker push \
+          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:client-${IMAGE_TAG}
