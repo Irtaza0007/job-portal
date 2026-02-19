@@ -30,7 +30,7 @@ jobs:
 
       # -------- Backend --------
       - name: Build backend
-        run: docker build -t server ./server
+        run: docker build -t server ./Server
 
       - name: Tag & Push backend
         run: |
@@ -48,7 +48,7 @@ jobs:
 
       # -------- Frontend --------
       - name: Build frontend
-        run: docker build -t client ./client
+        run: docker build -t client ./Client
 
       - name: Tag & Push frontend
         run: |
