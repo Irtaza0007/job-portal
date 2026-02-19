@@ -33,7 +33,7 @@ jobs:
 
       # -------- Backend --------
       - name: Build backend image
-        run: docker build -t server ./server
+        run: docker build -t server ./Server
 
       - name: Tag backend image
         run: |
@@ -47,7 +47,7 @@ jobs:
 
       # -------- Frontend --------
       - name: Build frontend image
-        run: docker build -t client ./client
+        run: docker build -t client ./Client
 
       - name: Tag frontend image
         run: |
