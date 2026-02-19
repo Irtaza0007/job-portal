@@ -15,7 +15,7 @@ A modern, full-stack Job Portal built with the powerful **MERN stack** — enabl
 ### 🎓 Student Role
 - Browse and search job listings
 - Apply to jobs with one click
-- Track application status in personal dashboard
+- Track application status in personal dashboard.
 
 ### 🧑‍💼 Recruiter Role
 - Post new job opportunities
