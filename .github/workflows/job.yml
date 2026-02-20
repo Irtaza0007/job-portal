@@ -76,7 +76,7 @@ jobs:
             AWS_ACCOUNT_ID=${{ secrets.AWS_ACCOUNT_ID }}
 
             echo "Go to project directory"
-            cd dockerdemoapp   # change if folder name different
+            cd job-portal  
 
             echo "Pull latest Prod branch"
             git fetch origin
